@@ -5,6 +5,8 @@ import '../../features/auth/data/auth_service.dart';
 import '../../features/auth/presentation/providers/auth_provider.dart';
 import '../../features/chats/data/services/chat_service.dart';
 import '../../features/chats/presentation/providers/chat_provider.dart';
+import '../../features/chats/presentation/cubit/chat_cubit.dart';
+
 
 import '../network/dio_client.dart';
 import '../network/token_store.dart';
@@ -38,4 +40,8 @@ void setupDependencies() {
   getIt.registerFactory<ChatProvider>(
     () => ChatProvider(getIt<ChatService>()),
   );
+
+  getIt.registerFactory<ChatCubit>(
+  () => ChatCubit(getIt<ChatService>()),
+);
 }

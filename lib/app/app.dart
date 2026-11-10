@@ -6,6 +6,9 @@ import '../features/auth/presentation/providers/auth_provider.dart';
 import '../features/auth/presentation/screens/login_screen.dart';
 import '../core/di/injection.dart';
 import '../features/chats/presentation/providers/chat_provider.dart';
+import 'package:flutter_bloc/flutter_bloc.dart';
+
+import '../features/chats/presentation/cubit/chat_cubit.dart';
 
 class ChatApp extends StatelessWidget {
   const ChatApp({super.key});
@@ -17,8 +20,8 @@ class ChatApp extends StatelessWidget {
         ChangeNotifierProvider(
           create: (_) => getIt<AuthProvider>(),
         ),
-        ChangeNotifierProvider(
-          create: (_) => getIt<ChatProvider>(),
+        BlocProvider<ChatCubit>(
+          create: (_) => getIt<ChatCubit>(),
         ),
       ],
       child: MaterialApp(
