@@ -1,4 +1,6 @@
-
+import 'package:chat_flutter_poc/features/profile/data/repositories/profile_repository_impl.dart';
+import 'package:chat_flutter_poc/features/profile/domain/repositories/profile_repository.dart';
+import 'package:chat_flutter_poc/features/profile/domain/usecases/update_profile_usecase.dart';
 import 'package:get_it/get_it.dart';
 
 import '../network/dio_client.dart';
@@ -17,7 +19,6 @@ import 'package:chat_flutter_poc/features/chat_list/data/repositories/conversati
 import 'package:chat_flutter_poc/features/chat_list/domain/repositories/conversation_repository.dart';
 import 'package:chat_flutter_poc/features/chat_list/presentation/cubit/conversation_cubit.dart';
 
-
 final getIt = GetIt.instance;
 
 Future<void> setupDependencies() async {
@@ -28,29 +29,37 @@ Future<void> setupDependencies() async {
 
   // Dio clients
   getIt.registerLazySingleton<DioClient>(
-    () => DioClient(
-      secureStorage: getIt<SecureStorageService>(),
-    ),
+    () => DioClient(secureStorage: getIt<SecureStorageService>()),
   );
 
   // A new Cubit for each Login screen
   getIt.registerFactory<LoginCubit>(
-    () => LoginCubit(
-      remoteDataSource: getIt<AuthRemoteDataSource>(),
-    ),
+    () => LoginCubit(remoteDataSource: getIt<AuthRemoteDataSource>()),
   );
 
   // Profile API
-  getIt.registerLazySingleton<ProfileLocalStorage>(
-    () => ProfileLocalStorage(),
+  getIt.registerLazySingleton<ProfileLocalStorage>(() => ProfileLocalStorage());
+
+  // Profile Update
+  // Data sources
+  getIt.registerLazySingleton<ProfileRemoteDataSource>(
+    () => ProfileRemoteDataSource(dioClient: getIt<DioClient>()),
   );
 
-  getIt.registerLazySingleton<ProfileRemoteDataSource>(
-    () => ProfileRemoteDataSource(
-      dioClient: getIt<DioClient>(),
+  // Repository
+  getIt.registerLazySingleton<ProfileRepository>(
+    () => ProfileRepositoryImpl(
+      remoteDataSource: getIt<ProfileRemoteDataSource>(),
     ),
   );
 
+  // Use case
+  getIt.registerLazySingleton<UpdateProfileUseCase>(
+    () => UpdateProfileUseCase(
+      repository: getIt<ProfileRepository>(),
+      localStorage: getIt<ProfileLocalStorage>(),
+    ),
+  );
   // Authentication API
   getIt.registerLazySingleton<AuthRemoteDataSource>(
     () => AuthRemoteDataSource(
@@ -60,12 +69,10 @@ Future<void> setupDependencies() async {
       profileLocalStorage: getIt<ProfileLocalStorage>(),
     ),
   );
-  
+
   // Conversation API
   getIt.registerLazySingleton<ConversationRemoteDataSource>(
-    () => ConversationRemoteDataSource(
-      dioClient: getIt<DioClient>(),
-    ),
+    () => ConversationRemoteDataSource(dioClient: getIt<DioClient>()),
   );
 
   // Conversation Repository
@@ -77,8 +84,6 @@ Future<void> setupDependencies() async {
 
   // Conversation Cubit
   getIt.registerFactory<ConversationCubit>(
-    () => ConversationCubit(
-      repository: getIt<ConversationRepository>(),
-    ),
+    () => ConversationCubit(repository: getIt<ConversationRepository>()),
   );
 }

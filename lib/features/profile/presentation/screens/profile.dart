@@ -4,6 +4,7 @@ import 'package:chat_flutter_poc/core/shared/widgets/buttons/app_button.dart';
 import 'package:chat_flutter_poc/core/shared/widgets/feedback/app_snackbar.dart';
 import 'package:chat_flutter_poc/core/theme/theme_controller.dart';
 import 'package:chat_flutter_poc/features/authentication/data/datasources/auth_remote_data_source.dart';
+import 'package:chat_flutter_poc/features/profile/presentation/screens/edit_profile_screen.dart';
 import 'package:flutter/material.dart';
 
 import 'package:chat_flutter_poc/core/shared/widgets/feedback/app_shimmer.dart';
@@ -108,6 +109,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
     }
   }
 
+  Future<void> _openEditProfile() async {
+  final profile = await _localStorage.getProfile();
+
+  if (!mounted) return;
+
+  if (profile == null) {
+    AppSnackBar.show(
+      context,
+      message: 'Unable to load profile.',
+    );
+    return;
+  }
+
+  final updatedProfile = await Navigator.of(context).push(
+    MaterialPageRoute(
+      builder: (_) => EditProfileScreen(
+        profile: profile,
+      ),
+    ),
+  );
+
+  if (!mounted || updatedProfile == null) return;
+
+  await _loadLocalProfile();
+}
+
   void _toggleTheme() {
     final isDarkMode = Theme.of(context).brightness == Brightness.dark;
 
@@ -148,20 +175,26 @@ class _ProfileScreenState extends State<ProfileScreen> {
         centerTitle: false,
         title: const Text('Profile'),
         actions: [
-          IconButton(
-            tooltip: theme.brightness == Brightness.dark
-                ? 'Switch to light mode'
-                : 'Switch to dark mode',
-            onPressed: _toggleTheme,
-            icon: Icon(
-              theme.brightness == Brightness.dark
-                  ? Icons.light_mode_outlined
-                  : Icons.dark_mode_outlined,
-            ),
-          ),
-          const SizedBox(width: 8),
-        ],
-      ),
+  IconButton(
+    tooltip: 'Edit profile',
+    onPressed: _isLoading ? null : _openEditProfile,
+    icon: const Icon(Icons.edit_outlined),
+  ),
+
+  IconButton(
+    tooltip: theme.brightness == Brightness.dark
+        ? 'Switch to light mode'
+        : 'Switch to dark mode',
+    onPressed: _toggleTheme,
+    icon: Icon(
+      theme.brightness == Brightness.dark
+          ? Icons.light_mode_outlined
+          : Icons.dark_mode_outlined,
+    ),
+  ),
+
+  const SizedBox(width: 8),
+],),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.all(20),
@@ -214,48 +247,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
               const SizedBox(height: 32),
 
-              // About section
-              if (_isLoading || _about.isNotEmpty) ...[
-                _buildSectionTitle('About'),
-                const SizedBox(height: 12),
-                _isLoading
-                    ? const AppShimmerBox(
-                        width: double.infinity,
-                        height: 65,
-                        radius: AppColors.radiusLg,
-                      )
-                    : _buildAboutCard(),
-                const SizedBox(height: 28),
-              ],
-
-              // Account information
-              _buildSectionTitle('Account information'),
-              const SizedBox(height: 16),
-
-              _buildInfoTile(
-                icon: Icons.person_outline,
-                label: 'Display name',
-                value: _displayName,
-              ),
-
-              _buildInfoTile(
-                icon: Icons.alternate_email,
-                label: 'Username',
-                value: _userName,
-              ),
-
-              _buildInfoTile(
-                icon: Icons.email_outlined,
-                label: 'Email address',
-                value: _email,
-              ),
-
-              _buildInfoTile(
-                icon: Icons.calendar_today_outlined,
-                label: 'Joined on',
-                value: _createdAtUtc,
-              ),
-              const SizedBox(height: 24),
 
               AppButton(
                 onPressed: _showLogoutConfirmation,

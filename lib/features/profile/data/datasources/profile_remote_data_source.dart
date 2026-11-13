@@ -1,4 +1,3 @@
-
 import 'package:dio/dio.dart';
 
 import '../../../../core/network/api_endpoints.dart';
@@ -9,23 +8,18 @@ import '../../../authentication/data/models/auth_user_model.dart';
 class ProfileRemoteDataSource {
   final DioClient dioClient;
 
-  ProfileRemoteDataSource({
-    required this.dioClient,
-  });
+  ProfileRemoteDataSource({required this.dioClient});
 
   Future<AuthUserModel> getMyProfile() async {
     try {
-      final response = await dioClient.apiDio.get(
-        ApiEndpoints.myProfile,
-      );
+      final response = await dioClient.apiDio.get(ApiEndpoints.myProfile);
 
       final json = Map<String, dynamic>.from(response.data as Map);
 
       final apiResponse = ApiResponse<AuthUserModel>.fromJson(
         json,
-        (data) => AuthUserModel.fromJson(
-          Map<String, dynamic>.from(data as Map),
-        ),
+        (data) =>
+            AuthUserModel.fromJson(Map<String, dynamic>.from(data as Map)),
       );
 
       if (!apiResponse.success || apiResponse.data == null) {
@@ -49,6 +43,49 @@ class ProfileRemoteDataSource {
       }
 
       throw Exception('Unable to load profile. Please try again.');
+    }
+  }
+
+  // Update
+  Future<AuthUserModel> updateMyProfile({
+    required String displayName,
+    required String about,
+  }) async {
+    try {
+      final response = await dioClient.apiDio.put(
+        ApiEndpoints.myProfile,
+        data: {'displayName': displayName, 'about': about},
+      );
+
+      final json = Map<String, dynamic>.from(response.data as Map);
+
+      final apiResponse = ApiResponse<AuthUserModel>.fromJson(
+        json,
+        (data) =>
+            AuthUserModel.fromJson(Map<String, dynamic>.from(data as Map)),
+      );
+
+      if (!apiResponse.success || apiResponse.data == null) {
+        throw Exception(
+          apiResponse.message.isNotEmpty
+              ? apiResponse.message
+              : 'Unable to update profile',
+        );
+      }
+
+      return apiResponse.data!;
+    } on DioException catch (e) {
+      final responseData = e.response?.data;
+
+      if (responseData is Map) {
+        final message = responseData['message'];
+
+        if (message is String && message.isNotEmpty) {
+          throw Exception(message);
+        }
+      }
+
+      throw Exception('Unable to update profile. Please try again.');
     }
   }
 }
