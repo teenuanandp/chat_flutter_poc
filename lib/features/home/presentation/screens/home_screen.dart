@@ -1,19 +1,13 @@
 import 'package:chat_flutter_poc/features/profile/presentation/screens/profile.dart';
 import 'package:flutter/material.dart';
 
-import '../../../chat/presentation/screens/chat_screen.dart';
-import '../../../study/presentation/screens/study_screen.dart';
+import 'package:chat_flutter_poc/features/chat_list/presentation/screens/chat_screen.dart';
+import 'package:chat_flutter_poc/features/study/presentation/screens/study_screen.dart';
+
 import 'package:chat_flutter_poc/core/theme/app_colors.dart';
 
 class HomeScreen extends StatefulWidget {
-  final String displayName;
-  final String email;
-
-  const HomeScreen({
-    super.key,
-    required this.displayName,
-    required this.email,
-  });
+  const HomeScreen({super.key});
 
   @override
   State<HomeScreen> createState() => _HomeScreenState();
@@ -24,10 +18,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   late final PageController _pageController;
 
-  final List<Widget> _screens = const [
-    ChatScreen(),
-    StudyScreen(),
-  ];
+  final List<Widget> _screens = const [ChatScreen(), StudyScreen()];
 
   @override
   void initState() {
@@ -59,13 +50,10 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  String get _screenTitle =>
-      _selectedIndex == 0 ? 'Chat' : 'Study';
+  String get _screenTitle => _selectedIndex == 0 ? 'Chat' : 'Study';
 
   String get _sectionTitle =>
-      _selectedIndex == 0
-          ? 'Your conversations'
-          : 'Your learning space';
+      _selectedIndex == 0 ? 'Your conversations' : 'Your learning space';
 
   void _showComingSoon(String feature) {
     ScaffoldMessenger.of(context).showSnackBar(
@@ -77,15 +65,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openProfile() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => ProfileScreen(
-          displayName: widget.displayName,
-          email: widget.email,
-        ),
-      ),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (_) => ProfileScreen()));
   }
 
   @override
@@ -135,10 +115,18 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
+
+            // Swipeable screen content
+            Expanded(
+              child: PageView(
+                controller: _pageController,
+                onPageChanged: _onPageChanged,
+                children: _screens,
+              ),
+            ),
           ],
         ),
       ),
-
       // Floating bottom navigation
       bottomNavigationBar: SafeArea(
         top: false,
@@ -148,9 +136,7 @@ class _HomeScreenState extends State<HomeScreen> {
             height: 72,
             decoration: BoxDecoration(
               color: colors.surface,
-              borderRadius: BorderRadius.circular(
-                AppColors.radius2xl,
-              ),
+              borderRadius: BorderRadius.circular(AppColors.radius2xl),
               boxShadow: [
                 BoxShadow(
                   color: colors.shadow.withValues(alpha: 0.12),
@@ -198,16 +184,10 @@ class _HomeScreenState extends State<HomeScreen> {
       child: Padding(
         padding: const EdgeInsets.all(6),
         child: Material(
-          color: isSelected
-              ? colors.primaryContainer
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(
-            AppColors.radiusLg,
-          ),
+          color: isSelected ? colors.primaryContainer : Colors.transparent,
+          borderRadius: BorderRadius.circular(AppColors.radiusLg),
           child: InkWell(
-            borderRadius: BorderRadius.circular(
-              AppColors.radiusLg,
-            ),
+            borderRadius: BorderRadius.circular(AppColors.radiusLg),
             onTap: () => _onTabSelected(index),
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,

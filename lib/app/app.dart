@@ -1,11 +1,9 @@
-
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 
 import 'package:chat_flutter_poc/core/theme/theme_controller.dart';
 import 'package:chat_flutter_poc/core/theme/app_theme.dart';
-import 'package:chat_flutter_poc/features/authentication/presentation/screens/welcome_screen.dart';
-import 'package:chat_flutter_poc/features/authentication/presentation/screens/login_screen.dart';
+import 'package:chat_flutter_poc/app/session_gate.dart';
 
 class MyApp extends StatelessWidget {
   const MyApp({super.key});
@@ -19,19 +17,14 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       title: 'Chat App',
 
-      // Light and dark theme configurations.
+      // Light and dark theme configurations
       theme: AppTheme.lightTheme,
       darkTheme: AppTheme.darkTheme,
 
       // System, Light, or Dark.
       themeMode: themeController.themeMode,
 
-      routes: {
-        // '/login': (context) => const LoginScreen(),
-        // '/register': (context) => const RegisterScreen(),
-      },
-
-      home: const WelcomeScreen(),
+      home: const SessionGate(),
     );
   }
 }

@@ -14,13 +14,9 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import '../../data/storage/profile_local_storage.dart';
 
 class ProfileScreen extends StatefulWidget {
-  final String displayName;
-  final String email;
 
   const ProfileScreen({
-    super.key,
-    required this.displayName,
-    required this.email,
+    super.key
   });
 
   @override
@@ -90,12 +86,12 @@ class _ProfileScreenState extends State<ProfileScreen> {
       setState(() {
         _displayName = profile?.displayName.isNotEmpty == true
             ? profile!.displayName
-            : widget.displayName;
+            : '';
 
         _userName = profile?.userName ?? '';
         _email = profile?.email.isNotEmpty == true
             ? profile!.email
-            : widget.email;
+            : '';
 
         _about = profile?.about ?? '';
         _status = profile?.status ?? '';
@@ -109,11 +105,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
     } catch (_) {
       if (!mounted) return;
 
-      setState(() {
-        _displayName = widget.displayName;
-        _email = widget.email;
-        _isLoading = false;
-      });
     }
   }
 
@@ -281,7 +272,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
   Widget _buildProfileAvatar() {
     final name = _displayName.trim().isNotEmpty
         ? _displayName
-        : widget.displayName;
+        : '';
 
     return AppAvatar(displayName: name, size: 112);
   }

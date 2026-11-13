@@ -1,5 +1,6 @@
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 
 import '../storage/secure_storage_service.dart';
 import 'api_endpoints.dart';
@@ -48,6 +49,9 @@ class DioClient {
 
             handler.next(options);
           } catch (error) {
+
+            debugPrint('\n ==================== Here the API problem ===================== \n $error.toString() \n');
+            
             handler.reject(
               DioException(
                 requestOptions: options,

@@ -11,4 +11,7 @@ class ApiEndpoints {
 
   // Users
   static const String myProfile = '/api/users/me';
+
+  // Chat List (Conversations)
+  static const String conversations = '/api/conversations';
 }

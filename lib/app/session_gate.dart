@@ -1,10 +1,9 @@
-
 import 'package:flutter/material.dart';
-
 import 'package:chat_flutter_poc/core/di/injection_container.dart';
 import 'package:chat_flutter_poc/features/authentication/data/datasources/auth_remote_data_source.dart';
-import 'package:chat_flutter_poc/features/authentication/data/models/auth_session_model.dart';
 import 'package:chat_flutter_poc/features/authentication/presentation/screens/welcome_screen.dart';
+
+// Import your actual HomeScreen path.
 import 'package:chat_flutter_poc/features/home/presentation/screens/home_screen.dart';
 
 class SessionGate extends StatefulWidget {
@@ -15,23 +14,25 @@ class SessionGate extends StatefulWidget {
 }
 
 class _SessionGateState extends State<SessionGate> {
-  late Future<AuthSession?> _sessionFuture;
+  late Future _sessionFuture;
 
   @override
   void initState() {
     super.initState();
-    _checkSession();
+    _restoreSession();
   }
 
-  void _checkSession() {
+  void _restoreSession() {
     _sessionFuture = getIt<AuthRemoteDataSource>().restoreSession();
   }
 
   @override
   Widget build(BuildContext context) {
-    return FutureBuilder<AuthSession?>(
+    return FutureBuilder(
       future: _sessionFuture,
       builder: (context, snapshot) {
+
+        // Checking existing session.
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
             body: Center(
@@ -40,32 +41,22 @@ class _SessionGateState extends State<SessionGate> {
           );
         }
 
+        // Network/server error.
         if (snapshot.hasError) {
           return Scaffold(
             body: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  const Text(
-                    'Unable to connect. Please check your internet connection.',
-                    textAlign: TextAlign.center,
-                  ),
+                  const Text('Unable to restore your session.'),
                   const SizedBox(height: 16),
                   ElevatedButton(
                     onPressed: () {
-                      setState(_checkSession);
+                      setState(() {
+                        _restoreSession();
+                      });
                     },
-                    child: const Text('Try again'),
-                  ),
-                  TextButton(
-                    onPressed: () {
-                      Navigator.of(context).pushReplacement(
-                        MaterialPageRoute(
-                          builder: (_) => const WelcomeScreen(),
-                        ),
-                      );
-                    },
-                    child: const Text('Continue to login'),
+                    child: const Text('Retry'),
                   ),
                 ],
               ),
@@ -73,16 +64,13 @@ class _SessionGateState extends State<SessionGate> {
           );
         }
 
-        final session = snapshot.data;
-
-        if (session == null) {
-          return const WelcomeScreen();
+        // Session restored successfully.
+        if (snapshot.data != null) {
+          return const HomeScreen();
         }
 
-        return HomeScreen(
-          displayName: session.user.displayName,
-          email: session.user.email,
-        );
+        // No valid session.
+        return const WelcomeScreen();
       },
     );
   }
