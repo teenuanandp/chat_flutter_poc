@@ -1,3 +1,8 @@
+import 'package:chat_flutter_poc/core/realtime/signalr_service.dart';
+import 'package:chat_flutter_poc/features/chat/data/datasources/chat_remote_data_source.dart';
+import 'package:chat_flutter_poc/features/chat/data/repositories/chat_repository_impl.dart';
+import 'package:chat_flutter_poc/features/chat/domain/repositories/chat_repository.dart';
+import 'package:chat_flutter_poc/features/chat/presentation/cubit/chat_messages_cubit.dart';
 import 'package:chat_flutter_poc/features/profile/data/repositories/profile_repository_impl.dart';
 import 'package:chat_flutter_poc/features/profile/domain/repositories/profile_repository.dart';
 import 'package:chat_flutter_poc/features/profile/domain/usecases/update_profile_usecase.dart';
@@ -85,5 +90,24 @@ Future<void> setupDependencies() async {
   // Conversation Cubit
   getIt.registerFactory<ConversationCubit>(
     () => ConversationCubit(repository: getIt<ConversationRepository>()),
+  );
+
+  // Chat module
+
+  getIt.registerLazySingleton<ChatRemoteDataSource>(
+    () => ChatRemoteDataSource(dioClient: getIt<DioClient>()),
+  );
+
+  getIt.registerLazySingleton<ChatRepository>(
+    () => ChatRepositoryImpl(remoteDataSource: getIt<ChatRemoteDataSource>()),
+  );
+
+  getIt.registerFactory<ChatMessagesCubit>(
+    () => ChatMessagesCubit(repository: getIt<ChatRepository>()),
+  );
+
+  // SignalR Service
+  getIt.registerLazySingleton<SignalRService>(
+    () => SignalRService(secureStorage: getIt<SecureStorageService>()),
   );
 }
