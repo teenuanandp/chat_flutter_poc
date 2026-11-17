@@ -4,7 +4,6 @@ import 'package:chat_flutter_poc/features/profile/data/storage/profile_local_sto
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-import '../../../../core/di/injection_container.dart';
 
 import '../cubit/chat_messages_cubit.dart';
 import '../cubit/chat_messages_state.dart';
@@ -19,35 +18,29 @@ class ChatDetailScreen extends StatefulWidget {
   const ChatDetailScreen({
     super.key,
     required this.conversation,
-    required this.profileLocalStorage
+    required this.profileLocalStorage,
   });
 
   @override
-  State<ChatDetailScreen> createState() =>
-      _ChatDetailScreenState();
+  State<ChatDetailScreen> createState() => _ChatDetailScreenState();
 }
 
 class _ChatDetailScreenState extends State<ChatDetailScreen> {
-
   String? currentUserId;
 
-  final TextEditingController _messageController =
-      TextEditingController();
+  final TextEditingController _messageController = TextEditingController();
 
-  final ScrollController _scrollController =
-      ScrollController();
+  final ScrollController _scrollController = ScrollController();
+
+  bool _isSending = false;
 
   bool _showScrollToBottom = false;
 
   String get displayName {
-    if (!widget.conversation.isGroup &&
-        widget.conversation.peer != null) {
-      final name =
-          widget.conversation.peer!.displayName;
+    if (!widget.conversation.isGroup && widget.conversation.peer != null) {
+      final name = widget.conversation.peer!.displayName;
 
-      return name.isNotEmpty
-          ? name
-          : widget.conversation.name;
+      return name.isNotEmpty ? name : widget.conversation.name;
     }
 
     return widget.conversation.name;
@@ -60,7 +53,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     _scrollController.addListener(_onScroll);
   }
 
-    Future<void> _loadCurrentUser() async {
+  Future<void> _loadCurrentUser() async {
     final profile = await widget.profileLocalStorage.getProfile();
 
     if (!mounted) return;
@@ -69,12 +62,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       currentUserId = profile?.id;
     });
   }
+
   void _onScroll() {
     if (!_scrollController.hasClients) return;
 
-    final showButton =
-        _scrollController.position.pixels >
-            300;
+    final showButton = _scrollController.position.pixels > 300;
 
     if (_showScrollToBottom != showButton) {
       setState(() {
@@ -84,11 +76,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
 
     // Load older messages near the top.
     if (_scrollController.position.pixels <= 100) {
-      context
-          .read<ChatMessagesCubit>()
-          .loadOlderMessages(
-            widget.conversation.id,
-          );
+      context.read<ChatMessagesCubit>().loadOlderMessages(
+        widget.conversation.id,
+      );
     }
   }
 
@@ -102,21 +92,46 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     );
   }
 
-  void _sendMessage() {
+  Future<void> _sendMessage() async {
     final text = _messageController.text.trim();
 
-    if (text.isEmpty) return;
+    if (text.isEmpty || _isSending) return;
 
-    // We'll connect the POST messages API here
-    // in the next sending-message implementation.
+    setState(() {
+      _isSending = true;
+    });
 
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text(
-          'Message sending API is not connected yet.',
-        ),
-      ),
-    );
+    try {
+      await context.read<ChatMessagesCubit>().sendMessage(
+        conversationId: widget.conversation.id,
+        content: text,
+      );
+
+      if (!mounted) return;
+
+      // Clear only if the input still contains the sent text.
+      if (_messageController.text.trim() == text) {
+        _messageController.clear();
+      }
+
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _scrollToBottom();
+        }
+      });
+    } catch (error) {
+      if (!mounted) return;
+
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Message sending failed: $error')));
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isSending = false;
+        });
+      }
+    }
   }
 
   @override
@@ -132,196 +147,150 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
 
-    return BlocProvider(
-      create: (_) => getIt<ChatMessagesCubit>()
-        ..loadMessages(widget.conversation.id),
-      child: Builder(
-        builder: (context) {
-          return Scaffold(
-            appBar: AppBar(
-              titleSpacing: 0,
-              title: Row(
+    return Scaffold(
+      appBar: AppBar(
+        titleSpacing: 0,
+        title: Row(
+          children: [
+            AppAvatar(displayName: displayName, size: 38),
+
+            const SizedBox(width: 10),
+
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  AppAvatar(
-                    displayName: displayName,
-                    size: 38,
+                  Text(
+                    displayName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.titleMedium,
                   ),
 
-                  const SizedBox(width: 10),
-
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment:
-                          CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          displayName,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: theme.textTheme.titleMedium,
-                        ),
-
-                        Text(
-                          widget.conversation.isGroup
-                              ? '${widget.conversation.memberCount} members'
-                              : (widget.conversation.peer
-                                          ?.isOnline ??
-                                      false)
-                                  ? 'Online'
-                                  : 'Offline',
-                          style: theme.textTheme.bodySmall
-                              ?.copyWith(
-                            color: colors.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
+                  Text(
+                    widget.conversation.isGroup
+                        ? '${widget.conversation.memberCount} members'
+                        : (widget.conversation.peer?.isOnline ?? false)
+                        ? 'Online'
+                        : 'Offline',
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: colors.onSurfaceVariant,
                     ),
                   ),
                 ],
               ),
-              actions: [
-                IconButton(
-                  onPressed: () {},
-                  icon: const Icon(Icons.call_outlined),
-                ),
-                IconButton(
-                  onPressed: () {},
-                  icon: const Icon(Icons.more_vert),
-                ),
-              ],
             ),
+          ],
+        ),
+        actions: [
+          IconButton(onPressed: () {}, icon: const Icon(Icons.call_outlined)),
+          IconButton(onPressed: () {}, icon: const Icon(Icons.more_vert)),
+        ],
+      ),
 
-            body: Column(
-              children: [
-                Expanded(
-                  child: BlocBuilder<
-                      ChatMessagesCubit,
-                      ChatMessagesState>(
-                    builder: (context, state) {
-                      if (state is ChatMessagesLoading) {
-                        return const MessageListShimmer();
-                      }
+      body: Column(
+        children: [
+          Expanded(
+            child: BlocBuilder<ChatMessagesCubit, ChatMessagesState>(
+              builder: (context, state) {
+                if (state is ChatMessagesLoading) {
+                  return const MessageListShimmer();
+                }
 
-                      if (state is ChatMessagesError) {
-                        return Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(24),
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.cloud_off_outlined,
-                                  size: 50,
-                                ),
-                                const SizedBox(height: 12),
-                                Text(
-                                  state.message,
-                                  textAlign: TextAlign.center,
-                                ),
-                                const SizedBox(height: 12),
-                                ElevatedButton(
-                                  onPressed: () {
-                                    context
-                                        .read<ChatMessagesCubit>()
-                                        .loadMessages(
-                                          widget.conversation.id,
-                                        );
-                                  },
-                                  child: const Text('Retry'),
-                                ),
-                              ],
-                            ),
+                if (state is ChatMessagesError) {
+                  return Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(Icons.cloud_off_outlined, size: 50),
+                          const SizedBox(height: 12),
+                          Text(state.message, textAlign: TextAlign.center),
+                          const SizedBox(height: 12),
+                          ElevatedButton(
+                            onPressed: () {
+                              context.read<ChatMessagesCubit>().loadMessages(
+                                widget.conversation.id,
+                              );
+                            },
+                            child: const Text('Retry'),
                           ),
-                        );
-                      }
+                        ],
+                      ),
+                    ),
+                  );
+                }
 
-                      if (state is ChatMessagesEmpty) {
-                        return ListView(
-                          physics:
-                              const AlwaysScrollableScrollPhysics(),
-                          children: const [
-                            SizedBox(height: 200),
-                            Icon(
-                              Icons.chat_bubble_outline,
-                              size: 55,
-                            ),
-                            SizedBox(height: 12),
-                            Center(
-                              child: Text(
-                                'Start your conversation',
-                              ),
-                            ),
-                          ],
-                        );
-                      }
+                if (state is ChatMessagesEmpty) {
+                  return ListView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    children: const [
+                      SizedBox(height: 200),
+                      Icon(Icons.chat_bubble_outline, size: 55),
+                      SizedBox(height: 12),
+                      Center(child: Text('Start your conversation')),
+                    ],
+                  );
+                }
 
-                      if (state is ChatMessagesLoaded) {
-                        return Stack(
-                          children: [
-                            ListView.builder(
-                              controller: _scrollController,
-                              padding: const EdgeInsets.all(16),
-                              itemCount:
-                                  state.messages.length +
-                                      (state.isLoadingMore ? 1 : 0),
-                              itemBuilder: (context, index) {
-                                if (state.isLoadingMore &&
-                                    index == 0) {
-                                  return const Padding(
-                                    padding: EdgeInsets.all(12),
-                                    child: Center(
-                                      child:
-                                          CircularProgressIndicator(),
-                                    ),
-                                  );
-                                }
+                if (state is ChatMessagesLoaded) {
+                  return Stack(
+                    children: [
+                      ListView.builder(
+                        controller: _scrollController,
+                        padding: const EdgeInsets.all(16),
+                        itemCount:
+                            state.messages.length +
+                            (state.isLoadingMore ? 1 : 0),
+                        itemBuilder: (context, index) {
+                          if (state.isLoadingMore && index == 0) {
+                            return const Padding(
+                              padding: EdgeInsets.all(12),
+                              child: Center(child: CircularProgressIndicator()),
+                            );
+                          }
 
-                                final messageIndex =
-                                    index -
-                                        (state.isLoadingMore ? 1 : 0);
+                          final messageIndex =
+                              index - (state.isLoadingMore ? 1 : 0);
 
-                                final message =
-                                    state.messages[messageIndex];
+                          final message = state.messages[messageIndex];
 
-                                final isMe =
-                                    message.senderId == currentUserId;
+                          final isMe = message.senderId == currentUserId;
 
-                                return MessageBubble(
-                                  key: ValueKey(message.id),
-                                  message: message,
-                                  isMe: isMe,
-                                  previewLength: 500,
-                                  incrementLength: 500,
-                                );
-                              },
-                            ),
+                          return MessageBubble(
+                            key: ValueKey(message.id),
+                            message: message,
+                            isMe: isMe,
+                            previewLength: 500,
+                            incrementLength: 500,
+                          );
+                        },
+                      ),
 
-                            if (_showScrollToBottom)
-                              Positioned(
-                                right: 16,
-                                bottom: 16,
-                                child: FloatingActionButton.small(
-                                  heroTag: 'chat_scroll_bottom',
-                                  onPressed: _scrollToBottom,
-                                  child: const Icon(
-                                    Icons.keyboard_arrow_down,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        );
-                      }
+                      // if (_showScrollToBottom)
+                      //   Positioned(
+                      //     right: 16,
+                      //     bottom: 16,
+                      //     child: FloatingActionButton.small(
+                      //       heroTag: 'chat_scroll_bottom',
+                      //       onPressed: _scrollToBottom,
+                      //       child: const Icon(
+                      //         Icons.keyboard_arrow_down,
+                      //       ),
+                      //     ),
+                      //   ),
+                    ],
+                  );
+                }
 
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                ),
-
-                _buildMessageInput(colors),
-              ],
+                return const SizedBox.shrink();
+              },
             ),
-          );
-        },
+          ),
+
+          _buildMessageInput(colors),
+        ],
       ),
     );
   }
@@ -333,16 +302,12 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
         padding: const EdgeInsets.all(12),
         child: Row(
           children: [
-            IconButton(
-              onPressed: () {},
-              icon: const Icon(Icons.attach_file),
-            ),
+            IconButton(onPressed: () {}, icon: const Icon(Icons.attach_file)),
 
             Expanded(
               child: TextField(
                 controller: _messageController,
-                textCapitalization:
-                    TextCapitalization.sentences,
+                textCapitalization: TextCapitalization.sentences,
                 minLines: 1,
                 maxLines: 5,
                 decoration: InputDecoration(
@@ -352,8 +317,7 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     borderRadius: BorderRadius.circular(25),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding:
-                      const EdgeInsets.symmetric(
+                  contentPadding: const EdgeInsets.symmetric(
                     horizontal: 18,
                     vertical: 12,
                   ),
@@ -367,12 +331,17 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
             CircleAvatar(
               backgroundColor: colors.primary,
               child: IconButton(
-                onPressed: _sendMessage,
-                icon: Icon(
-                  Icons.send,
-                  color: colors.onPrimary,
-                  size: 20,
-                ),
+                onPressed: _isSending ? null : _sendMessage,
+                icon: _isSending
+                    ? SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: colors.onPrimary,
+                        ),
+                      )
+                    : Icon(Icons.send, color: colors.onPrimary, size: 20),
               ),
             ),
           ],

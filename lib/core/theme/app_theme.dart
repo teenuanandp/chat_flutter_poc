@@ -1,4 +1,3 @@
-
 import 'package:flutter/material.dart';
 
 import 'app_colors.dart';
@@ -47,6 +46,27 @@ class AppTheme {
   }
 
   // ==========================================
+  // MESSAGE STATUS COLORS
+  // ==========================================
+  // Light Theme
+  static Color get sentTickColor => const Color.fromARGB(255, 115, 250, 184);
+
+  static Color get deliveredTickColor => const Color.fromARGB(255, 74, 122, 64);
+
+  static Color get readTickColor => const Color.fromARGB(255, 37, 43, 40);
+
+  static Color get pendingTickColor => const Color.fromARGB(255, 127, 127, 127);
+
+  // Dark Theme
+  static Color get darkSentTickColor => const Color.fromARGB(255, 12, 247, 134);
+
+  static Color get darkDeliveredTickColor => const Color.fromARGB(255, 27, 119, 6);
+
+  static Color get darkReadTickColor => const Color.fromARGB(255, 1, 20, 10);
+
+  static Color get darkPendingTickColor => const Color.fromARGB(255, 29, 49, 35);
+
+  // ==========================================
   // COMMON THEME BUILDER
   // ==========================================
 
@@ -64,47 +84,36 @@ class AppTheme {
     required Color error,
   }) {
     // Flutter's standard colour system.
-    final colorScheme = ColorScheme.fromSeed(
-      seedColor: primary,
-      brightness: brightness,
-    ).copyWith(
-      primary: primary,
-      onPrimary: onPrimary,
-      secondary: secondary,
-      onSecondary: brightness == Brightness.light
-          ? AppColors.secondaryForeground
-          : AppColors.darkSecondaryForeground,
-      surface: surface,
-      onSurface: foreground,
-      error: error,
-      onError: brightness == Brightness.light
-          ? AppColors.errorForeground
-          : AppColors.darkErrorForeground,
-      outline: border,
-      surfaceContainerHighest: surfaceVariant,
-    );
+    final colorScheme =
+        ColorScheme.fromSeed(
+          seedColor: primary,
+          brightness: brightness,
+        ).copyWith(
+          primary: primary,
+          onPrimary: onPrimary,
+          secondary: secondary,
+          onSecondary: brightness == Brightness.light
+              ? AppColors.secondaryForeground
+              : AppColors.darkSecondaryForeground,
+          surface: surface,
+          onSurface: foreground,
+          error: error,
+          onError: brightness == Brightness.light
+              ? AppColors.errorForeground
+              : AppColors.darkErrorForeground,
+          outline: border,
+          surfaceContainerHighest: surfaceVariant,
+        );
 
     // Typography.
     final textTheme = const TextTheme(
-      headlineLarge: TextStyle(
-        fontSize: 28,
-        fontWeight: FontWeight.bold,
-      ),
-      titleLarge: TextStyle(
-        fontSize: 20,
-        fontWeight: FontWeight.w600,
-      ),
-      titleMedium: TextStyle(
-        fontSize: 16,
-        fontWeight: FontWeight.w500,
-      ),
+      headlineLarge: TextStyle(fontSize: 28, fontWeight: FontWeight.bold),
+      titleLarge: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
+      titleMedium: TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
       bodyLarge: TextStyle(fontSize: 16),
       bodyMedium: TextStyle(fontSize: 14),
       bodySmall: TextStyle(fontSize: 12),
-    ).apply(
-      bodyColor: foreground,
-      displayColor: foreground,
-    );
+    ).apply(bodyColor: foreground, displayColor: foreground);
 
     return ThemeData(
       useMaterial3: true,
@@ -165,20 +174,13 @@ class AppTheme {
       ),
 
       // Dividers.
-      dividerTheme: DividerThemeData(
-        color: border,
-        thickness: 1,
-      ),
+      dividerTheme: DividerThemeData(color: border, thickness: 1),
 
       // Icons.
-      iconTheme: IconThemeData(
-        color: mutedForeground,
-      ),
+      iconTheme: IconThemeData(color: mutedForeground),
 
       // Loading indicators.
-      progressIndicatorTheme: ProgressIndicatorThemeData(
-        color: primary,
-      ),
+      progressIndicatorTheme: ProgressIndicatorThemeData(color: primary),
 
       // Snackbars.
       snackBarTheme: SnackBarThemeData(

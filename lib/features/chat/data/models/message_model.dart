@@ -41,7 +41,7 @@ class MessageModel {
     return MessageModel(
       id: json['id']?.toString() ?? '',
       conversationId: json['conversationId']?.toString() ?? '',
-      seq: json['seq'] as int? ?? 0,
+      seq: (json['seq'] as num?)?.toInt() ?? 0,
       senderId: json['senderId']?.toString() ?? '',
       senderName: json['senderName']?.toString() ?? '',
       type: json['type']?.toString() ?? 'Text',

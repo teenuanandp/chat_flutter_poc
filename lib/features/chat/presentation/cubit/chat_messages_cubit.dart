@@ -1,19 +1,36 @@
+import 'dart:async';
+
+import 'package:flutter/foundation.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
 import '../../data/models/message_model.dart';
 import '../../domain/repositories/chat_repository.dart';
+import '../../../../core/realtime/signalr_service.dart';
 import 'chat_messages_state.dart';
 
 class ChatMessagesCubit extends Cubit<ChatMessagesState> {
   final ChatRepository repository;
+  final SignalRService signalRService;
 
-  ChatMessagesCubit({
-    required this.repository,
-  }) : super(ChatMessagesInitial());
+  StreamSubscription<MessageModel>? _messageSubscription;
+
+  String? _activeConversationId;
+
+  // Holds messages received while REST history is loading.
+  final List<MessageModel> _pendingMessages = [];
+
+  ChatMessagesCubit({required this.repository, required this.signalRService})
+    : super(ChatMessagesInitial()) {
+    // Subscribe once when this Cubit is created.
+    _messageSubscription = signalRService.incomingMessages.listen(addMessage);
+  }
 
   static const int pageSize = 50;
 
   Future<void> loadMessages(String conversationId) async {
+    _activeConversationId = conversationId;
+    _pendingMessages.clear();
+
     emit(ChatMessagesLoading());
 
     try {
@@ -22,25 +39,37 @@ class ChatMessagesCubit extends Cubit<ChatMessagesState> {
         limit: pageSize,
       );
 
-      if (result.items.isEmpty) {
+      // Ignore an old request if another conversation was opened.
+      if (_activeConversationId != conversationId) return;
+
+      // Merge REST history and messages received during loading.
+      final messagesById = <String, MessageModel>{};
+
+      for (final message in result.items) {
+        messagesById[message.id] = message;
+      }
+
+      for (final message in _pendingMessages) {
+        if (message.conversationId == conversationId) {
+          messagesById[message.id] = message;
+        }
+      }
+
+      _pendingMessages.clear();
+
+      final messages = messagesById.values.toList()
+        ..sort((a, b) => a.seq.compareTo(b.seq));
+
+      if (messages.isEmpty) {
         emit(ChatMessagesEmpty());
         return;
       }
 
-      // API returns oldest first.
-      // Keep the same ordering in the UI.
-      emit(
-        ChatMessagesLoaded(
-          messages: result.items,
-          hasMore: result.hasMore,
-        ),
-      );
+      emit(ChatMessagesLoaded(messages: messages, hasMore: result.hasMore));
     } catch (e) {
-      emit(
-        ChatMessagesError(
-          e.toString().replaceFirst('Exception: ', ''),
-        ),
-      );
+      if (_activeConversationId != conversationId) return;
+
+      emit(ChatMessagesError(e.toString().replaceFirst('Exception: ', '')));
     }
   }
 
@@ -68,55 +97,110 @@ class ChatMessagesCubit extends Cubit<ChatMessagesState> {
         beforeSeq: oldestSeq,
       );
 
-      final existingIds = currentState.messages
-          .map((message) => message.id)
-          .toSet();
+      // Read the latest state after awaiting the API.
+      // This prevents losing messages received during pagination.
+      final latestState = state;
 
-      final olderMessages = result.items
-          .where((message) => !existingIds.contains(message.id))
-          .toList();
+      if (latestState is! ChatMessagesLoaded) return;
 
-      emit(
-        ChatMessagesLoaded(
-          messages: [
-            ...olderMessages,
-            ...currentState.messages,
-          ],
-          hasMore: result.hasMore,
-        ),
-      );
+      final messagesById = <String, MessageModel>{};
+
+      for (final message in result.items) {
+        messagesById[message.id] = message;
+      }
+
+      for (final message in latestState.messages) {
+        messagesById[message.id] = message;
+      }
+
+      final messages = messagesById.values.toList()
+        ..sort((a, b) => a.seq.compareTo(b.seq));
+
+      emit(ChatMessagesLoaded(messages: messages, hasMore: result.hasMore));
     } catch (_) {
-      // Preserve the existing messages if pagination fails.
-      emit(
-        ChatMessagesLoaded(
-          messages: currentState.messages,
-          hasMore: currentState.hasMore,
-        ),
-      );
+      final latestState = state;
+
+      if (latestState is ChatMessagesLoaded) {
+        emit(
+          ChatMessagesLoaded(
+            messages: latestState.messages,
+            hasMore: latestState.hasMore,
+          ),
+        );
+      }
     }
   }
 
+  Future<void> sendMessage({
+    required String conversationId,
+    required String content,
+  }) async {
+    final text = content.trim();
+
+    if (text.isEmpty) return;
+
+    try {
+      final message = await signalRService.sendTextMessage(
+        conversationId: conversationId,
+        content: text,
+      );
+
+      // Add the server-acknowledged message to the UI.
+      // ReceiveMessage may also deliver the same message.
+      // addMessage() must deduplicate using message.id.
+      addMessage(message);
+    } catch (error, stackTrace) {
+      debugPrint('CHAT CUBIT SEND FAILED: $error');
+      debugPrintStack(stackTrace: stackTrace);
+      rethrow;
+    }
+  }
+
+  // Called automatically whenever SignalR publishes a message.
   void addMessage(MessageModel message) {
+    // Don't show messages belonging to another conversation.
+    if (message.conversationId != _activeConversationId) {
+      return;
+    }
+
     final currentState = state;
 
-    if (currentState is ChatMessagesLoaded) {
-      if (currentState.messages.any((m) => m.id == message.id)) {
-        return;
+    // REST history is still loading. Buffer the message.
+    if (currentState is ChatMessagesLoading ||
+        currentState is ChatMessagesInitial) {
+      if (!_pendingMessages.any((m) => m.id == message.id)) {
+        _pendingMessages.add(message);
       }
-
-      emit(
-        ChatMessagesLoaded(
-          messages: [...currentState.messages, message],
-          hasMore: currentState.hasMore,
-        ),
-      );
-    } else {
-      emit(
-        ChatMessagesLoaded(
-          messages: [message],
-          hasMore: false,
-        ),
-      );
+      return;
     }
+
+    final messages = currentState is ChatMessagesLoaded
+        ? List<MessageModel>.from(currentState.messages)
+        : <MessageModel>[];
+
+    // SignalR may echo a message already present in REST or local state.
+    if (messages.any((m) => m.id == message.id)) {
+      return;
+    }
+
+    messages.add(message);
+
+    // Keep server sequence ordering.
+    messages.sort((a, b) => a.seq.compareTo(b.seq));
+
+    emit(
+      ChatMessagesLoaded(
+        messages: messages,
+        hasMore: currentState is ChatMessagesLoaded
+            ? currentState.hasMore
+            : false,
+      ),
+    );
+  }
+
+  @override
+  Future<void> close() async {
+    await _messageSubscription?.cancel();
+    return super.close();
   }
 }

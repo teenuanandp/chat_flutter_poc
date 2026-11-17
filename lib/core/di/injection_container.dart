@@ -103,7 +103,10 @@ Future<void> setupDependencies() async {
   );
 
   getIt.registerFactory<ChatMessagesCubit>(
-    () => ChatMessagesCubit(repository: getIt<ChatRepository>()),
+    () => ChatMessagesCubit(
+      repository: getIt<ChatRepository>(),
+      signalRService: getIt<SignalRService>(),
+    ),
   );
 
   // SignalR Service

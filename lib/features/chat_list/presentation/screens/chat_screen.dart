@@ -129,7 +129,7 @@ class _ChatScreenContent extends StatelessWidget {
               child: ListView.separated(
                 physics: const AlwaysScrollableScrollPhysics(),
                 itemCount: state.conversations.length,
-                separatorBuilder: (_, __) {
+                separatorBuilder: (_, _) {
                   return Divider(
                     height: 1,
                     indent: 80,
@@ -146,7 +146,7 @@ class _ChatScreenContent extends StatelessWidget {
                         context,
                         MaterialPageRoute(
                           builder: (_) => BlocProvider(
-                            create: (_) => getIt<ChatMessagesCubit>(),
+                            create: (_) => getIt<ChatMessagesCubit>()..loadMessages(conversation.id),
                             child: ChatDetailScreen(
                               conversation: conversation,
                               profileLocalStorage: getIt<ProfileLocalStorage>(),

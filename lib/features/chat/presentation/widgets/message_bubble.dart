@@ -1,3 +1,4 @@
+import 'package:chat_flutter_poc/core/theme/app_theme.dart';
 import 'package:chat_flutter_poc/features/chat/data/models/message_model.dart';
 import 'package:flutter/material.dart';
 
@@ -110,10 +111,11 @@ class _MessageBubbleState extends State<MessageBubble> {
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final colors = theme.colorScheme;
+    bool isDark = theme.brightness == Brightness.dark;
 
-    final bubbleColor = widget.isMe
-        ? colors.primary
-        : colors.surface;
+    final tickColor = isDark ? colors.onPrimary : colors.secondary;
+
+    final bubbleColor = widget.isMe ? colors.primary : colors.surface;
 
     final textColor = widget.isMe ? colors.onPrimary : colors.onSurface;
 
@@ -260,11 +262,7 @@ class _MessageBubbleState extends State<MessageBubble> {
 
                 if (widget.isMe) ...[
                   const SizedBox(width: 4),
-                  _buildStatusIcon(
-                    widget.message.status,
-                    mutedColor,
-                    colors.primary,
-                  ),
+                  _buildStatusIcon(widget.message.status, isDark),
                 ],
               ],
             ),
@@ -327,19 +325,39 @@ class _MessageBubbleState extends State<MessageBubble> {
     );
   }
 
-  Widget _buildStatusIcon(MessageStatus status, Color color, Color readColor) {
+  Widget _buildStatusIcon(MessageStatus status, bool isDark) {
     switch (status) {
       case MessageStatus.read:
-        return Icon(Icons.done_all, size: 15, color: readColor);
+        return Icon(
+          Icons.done_all,
+          size: 15,
+          color: isDark ? AppTheme.darkReadTickColor : AppTheme.readTickColor,
+        );
 
       case MessageStatus.delivered:
-        return Icon(Icons.done_all, size: 15, color: color);
+        return Icon(
+          Icons.done_all,
+          size: 15,
+          color: isDark
+              ? AppTheme.darkDeliveredTickColor
+              : AppTheme.deliveredTickColor,
+        );
 
       case MessageStatus.sent:
-        return Icon(Icons.done, size: 15, color: color);
+        return Icon(
+          Icons.done,
+          size: 15,
+          color: isDark ? AppTheme.darkSentTickColor : AppTheme.sentTickColor,
+        );
 
       case MessageStatus.pending:
-        return Icon(Icons.access_time, size: 13, color: color);
+        return Icon(
+          Icons.access_time,
+          size: 13,
+          color: isDark
+              ? AppTheme.darkPendingTickColor
+              : AppTheme.pendingTickColor,
+        );
     }
   }
 
