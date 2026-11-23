@@ -148,7 +148,13 @@ class SignalRService {
 
       if (rawEvent is! Map) return;
 
-      final event = TypingEvent.fromJson(Map<String, dynamic>.from(rawEvent));
+      final event = TypingEvent(
+        conversationId: rawEvent['conversationId']?.toString() ?? '',
+        userId: rawEvent['userId']?.toString() ?? '',
+        isTyping: isTyping,
+      );
+
+      _typingController.add(event);
 
       debugPrint('SIGNALR TYPING: ${event.userId} - $isTyping');
 
@@ -246,13 +252,11 @@ class SignalRService {
 class TypingEvent {
   final String conversationId;
   final String userId;
+  final bool isTyping;
 
-  const TypingEvent({required this.conversationId, required this.userId});
-
-  factory TypingEvent.fromJson(Map<String, dynamic> json) {
-    return TypingEvent(
-      conversationId: json['conversationId']?.toString() ?? '',
-      userId: json['userId']?.toString() ?? '',
-    );
-  }
+  const TypingEvent({
+    required this.conversationId,
+    required this.userId,
+    required this.isTyping,
+  });
 }

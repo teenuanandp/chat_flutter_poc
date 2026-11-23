@@ -4,7 +4,6 @@ import 'package:chat_flutter_poc/features/profile/data/storage/profile_local_sto
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
 
-
 import '../cubit/chat_messages_cubit.dart';
 import '../cubit/chat_messages_state.dart';
 
@@ -35,6 +34,11 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   bool _isSending = false;
 
   bool _showScrollToBottom = false;
+  int _newMessagesCount = 0;
+
+  String? _lastMessageId;
+
+  static const double _bottomThreshold = 100;
 
   String get displayName {
     if (!widget.conversation.isGroup && widget.conversation.peer != null) {
@@ -61,21 +65,83 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     setState(() {
       currentUserId = profile?.id;
     });
+
+    if (currentUserId != null) {
+      context.read<ChatMessagesCubit>().setCurrentUserId(currentUserId!);
+    }
+  }
+
+  void _onMessagesUpdated(ChatMessagesState state) {
+    if (state is! ChatMessagesLoaded || state.messages.isEmpty) {
+      return;
+    }
+
+    final latestMessage = state.messages.last;
+
+    // Initial load: remember the latest message.
+    if (_lastMessageId == null) {
+      _lastMessageId = latestMessage.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _scrollToBottom();
+        }
+      });
+      return;
+    }
+
+    // No new message.
+    if (_lastMessageId == latestMessage.id) {
+      return;
+    }
+
+    _lastMessageId = latestMessage.id;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scrollController.hasClients) return;
+
+      final position = _scrollController.position;
+
+      final isNearBottom =
+          position.maxScrollExtent - position.pixels <= _bottomThreshold;
+
+      // My own message or user already at bottom:
+      // automatically show the latest message.
+      if (latestMessage.senderId == currentUserId || isNearBottom) {
+        _newMessagesCount = 0;
+        _scrollToBottom();
+        return;
+      }
+
+      // Another user sent a message while we are reading older messages.
+      setState(() {
+        _newMessagesCount++;
+        _showScrollToBottom = true;
+      });
+    });
   }
 
   void _onScroll() {
     if (!_scrollController.hasClients) return;
 
-    final showButton = _scrollController.position.pixels > 300;
+    final position = _scrollController.position;
 
-    if (_showScrollToBottom != showButton) {
+    final isNearBottom =
+        position.maxScrollExtent - position.pixels <= _bottomThreshold;
+
+    final shouldShowButton = !isNearBottom;
+    final shouldResetCount = isNearBottom && _newMessagesCount > 0;
+
+    if (_showScrollToBottom != shouldShowButton || shouldResetCount) {
       setState(() {
-        _showScrollToBottom = showButton;
+        _showScrollToBottom = shouldShowButton;
+
+        if (shouldResetCount) {
+          _newMessagesCount = 0;
+        }
       });
     }
 
-    // Load older messages near the top.
-    if (_scrollController.position.pixels <= 100) {
+    if (position.pixels <= 100) {
       context.read<ChatMessagesCubit>().loadOlderMessages(
         widget.conversation.id,
       );
@@ -85,9 +151,13 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
   void _scrollToBottom() {
     if (!_scrollController.hasClients) return;
 
+    setState(() {
+      _newMessagesCount = 0;
+    });
+
     _scrollController.animateTo(
       _scrollController.position.maxScrollExtent,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 350),
       curve: Curves.easeOut,
     );
   }
@@ -102,6 +172,9 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
     });
 
     try {
+      // stop typing indication
+      context.read<ChatMessagesCubit>().stopLocalTyping(widget.conversation.id);
+
       await context.read<ChatMessagesCubit>().sendMessage(
         conversationId: widget.conversation.id,
         content: text,
@@ -167,15 +240,29 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     style: theme.textTheme.titleMedium,
                   ),
 
-                  Text(
-                    widget.conversation.isGroup
-                        ? '${widget.conversation.memberCount} members'
-                        : (widget.conversation.peer?.isOnline ?? false)
-                        ? 'Online'
-                        : 'Offline',
-                    style: theme.textTheme.bodySmall?.copyWith(
-                      color: colors.onSurfaceVariant,
-                    ),
+                  ValueListenableBuilder<bool>(
+                    valueListenable: context
+                        .read<ChatMessagesCubit>()
+                        .isOtherUserTyping,
+                    builder: (context, isTyping, child) {
+                      if (isTyping) {
+                        return const Text(
+                          'Typing...',
+                          style: TextStyle(
+                            color: Colors.green,
+                            fontSize: 12,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        );
+                      }
+
+                      return Text(
+                        widget.conversation.peer?.isOnline == true
+                            ? 'Online'
+                            : 'Offline',
+                        style: const TextStyle(fontSize: 12),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -191,7 +278,10 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
       body: Column(
         children: [
           Expanded(
-            child: BlocBuilder<ChatMessagesCubit, ChatMessagesState>(
+            child: BlocConsumer<ChatMessagesCubit, ChatMessagesState>(
+              listener: (context, state) {
+                _onMessagesUpdated(state);
+              },
               builder: (context, state) {
                 if (state is ChatMessagesLoading) {
                   return const MessageListShimmer();
@@ -268,18 +358,48 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                         },
                       ),
 
-                      // if (_showScrollToBottom)
-                      //   Positioned(
-                      //     right: 16,
-                      //     bottom: 16,
-                      //     child: FloatingActionButton.small(
-                      //       heroTag: 'chat_scroll_bottom',
-                      //       onPressed: _scrollToBottom,
-                      //       child: const Icon(
-                      //         Icons.keyboard_arrow_down,
-                      //       ),
-                      //     ),
-                      //   ),
+                      if (_showScrollToBottom)
+                        Positioned(
+                          right: 8,
+                          bottom: 12,
+                          child: Material(
+                            elevation: 4,
+                            borderRadius: BorderRadius.circular(30),
+                            color: colors.surface,
+                            child: InkWell(
+                              borderRadius: BorderRadius.circular(30),
+                              onTap: _scrollToBottom,
+                              child: Padding(
+                                padding: EdgeInsets.symmetric(
+                                  horizontal: _newMessagesCount > 0 ? 14 : 10,
+                                  vertical: 10,
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    if (_newMessagesCount > 0) ...[
+                                      Text(
+                                        '$_newMessagesCount new message${_newMessagesCount > 1 ? 's' : ''}',
+                                        style: theme.textTheme.labelMedium
+                                            ?.copyWith(
+                                              fontWeight: FontWeight.w600,
+                                              color: colors.onSurface,
+                                            ),
+                                      ),
+                                      const SizedBox(width: 8),
+                                    ],
+
+                                    Icon(
+                                      Icons.keyboard_arrow_down_rounded,
+                                      size: 24,
+                                      color: colors.primary,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
                     ],
                   );
                 }
@@ -322,6 +442,15 @@ class _ChatDetailScreenState extends State<ChatDetailScreen> {
                     vertical: 12,
                   ),
                 ),
+                onChanged: (value) {
+                  final cubit = context.read<ChatMessagesCubit>();
+
+                  if (value.trim().isNotEmpty) {
+                    cubit.onLocalTyping(widget.conversation.id);
+                  } else {
+                    cubit.stopLocalTyping(widget.conversation.id);
+                  }
+                },
                 onSubmitted: (_) => _sendMessage(),
               ),
             ),

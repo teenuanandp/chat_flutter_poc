@@ -13,8 +13,23 @@ class ChatMessagesCubit extends Cubit<ChatMessagesState> {
   final SignalRService signalRService;
 
   StreamSubscription<MessageModel>? _messageSubscription;
+  // Remote typing state for the active conversation.
+  final ValueNotifier<bool> isOtherUserTyping = ValueNotifier(false);
 
+  // SignalR typing subscription.
+  StreamSubscription<TypingEvent>? _typingSubscription;
+
+  // Current conversation and user.
   String? _activeConversationId;
+  String? _currentUserId;
+
+  // Local typing control.
+  Timer? _typingStopTimer;
+  DateTime? _lastTypingStartedAt;
+  bool _isLocalTyping = false;
+
+  // Remote typing expiry.
+  Timer? _remoteTypingTimer;
 
   // Holds messages received while REST history is loading.
   final List<MessageModel> _pendingMessages = [];
@@ -23,11 +38,82 @@ class ChatMessagesCubit extends Cubit<ChatMessagesState> {
     : super(ChatMessagesInitial()) {
     // Subscribe once when this Cubit is created.
     _messageSubscription = signalRService.incomingMessages.listen(addMessage);
+    _typingSubscription = signalRService.typingEvents.listen(
+      _handleTypingEvent,
+    );
   }
 
   static const int pageSize = 50;
 
+  void setCurrentUserId(String userId) {
+    _currentUserId = userId;
+  }
+
+  void setActiveConversation(String conversationId) {
+    _activeConversationId = conversationId;
+    isOtherUserTyping.value = false;
+    _remoteTypingTimer?.cancel();
+  }
+
+  void _handleTypingEvent(TypingEvent event) {
+    if (event.conversationId != _activeConversationId) return;
+
+    // Ignore our own typing events.
+    if (event.userId == _currentUserId) return;
+
+    _remoteTypingTimer?.cancel();
+
+    if (event.isTyping) {
+      isOtherUserTyping.value = true;
+
+      // Automatically clear stale typing indicators.
+      _remoteTypingTimer = Timer(const Duration(seconds: 5), () {
+        isOtherUserTyping.value = false;
+      });
+    } else {
+      isOtherUserTyping.value = false;
+    }
+  }
+
+  void stopLocalTyping(String conversationId) {
+    _typingStopTimer?.cancel();
+
+    if (!_isLocalTyping) return;
+
+    _isLocalTyping = false;
+
+    signalRService.typingStopped(conversationId).catchError((error) {
+      debugPrint('TYPING STOP FAILED: $error');
+    });
+  }
+
+  void onLocalTyping(String conversationId) {
+    final now = DateTime.now();
+
+    // Send TypingStarted at most once every 2 seconds.
+    final shouldNotifyServer =
+        _lastTypingStartedAt == null ||
+        now.difference(_lastTypingStartedAt!) >= const Duration(seconds: 2);
+
+    if (shouldNotifyServer) {
+      _lastTypingStartedAt = now;
+      _isLocalTyping = true;
+
+      signalRService.typingStarted(conversationId).catchError((error) {
+        debugPrint('TYPING START FAILED: $error');
+      });
+    }
+
+    // Stop typing after the user pauses.
+    _typingStopTimer?.cancel();
+
+    _typingStopTimer = Timer(const Duration(milliseconds: 1500), () {
+      stopLocalTyping(conversationId);
+    });
+  }
+
   Future<void> loadMessages(String conversationId) async {
+    setActiveConversation(conversationId);
     _activeConversationId = conversationId;
     _pendingMessages.clear();
 
@@ -201,6 +287,17 @@ class ChatMessagesCubit extends Cubit<ChatMessagesState> {
   @override
   Future<void> close() async {
     await _messageSubscription?.cancel();
-    return super.close();
+    await _typingSubscription?.cancel();
+
+    _typingStopTimer?.cancel();
+    _remoteTypingTimer?.cancel();
+
+    if (_activeConversationId != null) {
+      stopLocalTyping(_activeConversationId!);
+    }
+
+    isOtherUserTyping.dispose();
+
+    await super.close();
   }
 }
