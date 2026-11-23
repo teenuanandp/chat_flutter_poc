@@ -1,3 +1,4 @@
+// ignore_for_file: unused_element, unused_field
 import 'package:chat_flutter_poc/features/profile/presentation/screens/profile.dart';
 import 'package:flutter/material.dart';
 

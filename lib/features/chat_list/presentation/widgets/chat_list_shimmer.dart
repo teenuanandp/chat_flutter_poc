@@ -1,3 +1,4 @@
+// ignore_for_file: unused_element, unused_field,unused_local_variable
 
 import 'package:flutter/material.dart';
 import 'package:chat_flutter_poc/core/shared/widgets/feedback/app_shimmer.dart';

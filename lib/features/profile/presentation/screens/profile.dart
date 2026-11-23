@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element, unused_field
+
 import 'package:chat_flutter_poc/core/di/injection_container.dart';
 import 'package:chat_flutter_poc/core/shared/widgets/avatar/app_avatar.dart';
 import 'package:chat_flutter_poc/core/shared/widgets/buttons/app_button.dart';

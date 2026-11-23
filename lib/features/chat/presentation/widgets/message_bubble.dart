@@ -1,3 +1,5 @@
+// ignore_for_file: unused_element, unused_field,unused_local_variable
+
 import 'package:chat_flutter_poc/core/theme/app_theme.dart';
 import 'package:chat_flutter_poc/features/chat/data/models/message_model.dart';
 import 'package:flutter/material.dart';
